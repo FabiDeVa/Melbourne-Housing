@@ -1,0 +1,193 @@
+# Assignment Project - STA 4102
+
+## Wine Data
+
+#### Open and read .csv file
+
+```{r}
+Data = read.csv("melb_data.csv", header = TRUE)
+```
+
+```{r}
+dim(Data)
+sum(is.na(Data))
+Data = na.omit(Data)
+sum(is.na(Data))
+```
+
+```{r}
+library(dplyr)
+glimpse(Data)
+```
+
+```{r}
+sapply(Data, class)
+```
+
+Feature explanation:
+
+#### Exploratory Analysis / Descriptive Statistics
+
+```{r}
+summary(Data$Price) 
+```
+
+```{r}
+pairs(select_if(Data, is.numeric))
+```
+
+```{r}
+library(corrplot)
+corrplot(cor(select_if(Data, is.numeric)))
+```
+
+```{r}
+cor(select_if(Data, is.numeric))
+```
+
+```{r}
+hist(Data$Price)
+```
+
+#### Training
+
+```{r}
+library(caret)
+set.seed(123)
+trainIdx = createDataPartition(Data$Price, p = 0.7, list = FALSE, times = 1)
+TrainingData = Data[ trainIdx ,]
+TestingData = Data[ -trainIdx ,]
+dim(TrainingData)
+dim(TestingData)
+```
+
+### Linear Regression
+
+```{r}
+model_full = lm(Price ~ Rooms + Bathroom + Type + Distance + Car + Landsize + BuildingArea + YearBuilt, data = TrainingData)
+summary(model_full)
+```
+
+Model R\^2 = 0.5557, 55.57% of variability in data explained by this model.
+
+```{r}
+PredictionFull = predict(model_full, newdata = TestingData)
+MSE_Full = mean((PredictionFull - TestingData$Price)^2)
+RMSE_Full = sqrt(MSE_Full)
+RMSE_Full
+```
+
+```{r}
+sqrt(mean(model_full$residuals^2))
+```
+
+```{r}
+# Model without Type, Car, Landsize
+model = lm(Price ~ Rooms + Bathroom + YearBuilt + Distance + BuildingArea, data = TrainingData)
+summary(model)
+```
+
+```{r}
+Prediction = predict(model, newdata = TestingData)
+MSE = mean((Prediction - TestingData$Price)^2)
+RMSE = sqrt(MSE)
+RMSE
+```
+
+```{r}
+sqrt(mean(model$residuals^2))
+```
+
+RMSE =
+
+Original model RMSE =
+
+Considering "HeartDisease" takes on either the value of 0 or not. The model RMSE for training and testing is not too far off, with the original having RMSE = 5977.949 (a difference of 218.328) therefore the model is pretty good. (Model is not overfit bc RMSE's are similar, and does perform consistently with new data)
+
+### Decision Tree
+
+```{r}
+library(tree)
+Tree = tree(Price ~ Rooms + Bathroom + YearBuilt + Distance + BuildingArea, data = TrainingData)
+plot(Tree)
+text(Tree, cex = .75)
+summary(Tree)
+```
+
+```{r}
+print("Making predictions for the following 5 houses:")
+print(head(TrainingData))
+
+print("The predictions are")
+print(predict(Tree, head(TrainingData)))
+
+print("Actual Price")
+print(head(TrainingData$Price))
+```
+
+```{r}
+PredictionTree = predict(Tree, newdata = TrainingData)
+MSE = mean((PredictionTree - TestingData$Price)^2)
+RMSE = sqrt(MSE)
+RMSE
+```
+
+```{r}
+library(rpart)
+library(rpart.plot)
+tree2 = rpart(Price ~ Rooms + Bathroom + YearBuilt + Distance + BuildingArea, data = TrainingData, control = rpart.control(minsplit = 2, cp = 0.005, maxdepth = 30))
+# summary(tree2)
+best2 = tree2$cptable[which.min(tree2$cptable[,'xerror']),'CP']
+prunetree2 = prune(tree2, cp = best2)
+prp(prunetree2)
+```
+
+```{r}
+print("Making predictions for the last 5 houses:")
+print(head(TrainingData))
+
+print("Predicted Price:")
+print(predict(tree2, tail(TrainingData)))
+
+print("Actual Price:")
+print(tail(TrainingData$Price))
+```
+
+```{r}
+PredictionTree2 = predict(tree2, newdata = TrainingData)
+MSE = mean((PredictionTree2 - TestingData$Price)^2)
+RMSE = sqrt(MSE)
+RMSE
+```
+
+RMSE = 0.4835247 (tree 1)
+
+RMSE = 0.4938585 (tree 2)
+
+The weighted average error between predictions and actual values is 0.940, which is only decent considering the range of quality in the data set is from 3 - 8.
+
+### Random Forest
+
+```{r}
+library(randomForest)
+rf1 = train(Price ~ Rooms + Bathroom + YearBuilt + Distance + BuildingArea, method = "rf", data = Data, trControl = trainControl(method = 'cv', number = 3))
+summary(rf1)
+```
+
+```{r}
+library(ROCR)
+prediction1 = predict(rf1, newdata = TestingData)
+```
+
+```{r}
+rf = randomForest(Price ~ Rooms + Bathroom + YearBuilt + Distance + BuildingArea, data = Data, importance = TRUE, mtry = 2)
+vi = varImpPlot(rf)
+```
+
+```{r}
+rf
+```
+
+```{r}
+summary(rf)
+```
